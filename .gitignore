@@ -1,0 +1,48 @@
+@"
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.Python
+*.egg-info/
+dist/
+build/
+.eggs/
+
+# Virtual environment
+.venv/
+venv/
+env/
+distrq/
+.distrq/ 
+
+# Environment variables
+.env
+.env.*
+
+
+# Docker
+.dockerignore
+
+# Database
+*.sql.bak
+postgres_data/
+
+# Logs
+*.log
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+*.swp
+
+# Pytest
+.pytest_cache/
+htmlcov/
+.coverage
+"@ | Set-Content .gitignore
