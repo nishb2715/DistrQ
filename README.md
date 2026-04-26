@@ -184,6 +184,29 @@ curl -X POST http://localhost:8000/tasks/bulk \
 
 ## 🧪 Benchmark Results (Expected)
 
+### Test 1 — Normal Run (10K tasks, 3 workers)
+✅ 10,000 tasks ingested in 1.87s (5,354 tasks/sec)
+✅ COMPLETED : 10,000 (100.00%)
+❌ FAILED    : 0
+Terminal Total : 10,000 / 10,000
+Total Elapsed  : 28.2s
+Throughput     : 355 tasks/sec
+🏆 ZERO TASK LOSS ACHIEVED — 100% of tasks reached COMPLETED state.<img width="450" height="856" alt="Screenshot 2026-04-26 113540" src="https://github.com/user-attachments/assets/accd9aeb-4b2d-49a1-b924-1939023ec57b" />
+
+
+### Test 2 — Worker Killed Mid-Run (fault tolerance proof)
+✅ 10,000 tasks ingested in 1.74s (5,748 tasks/sec)
+💥 Worker distrq-worker-1 killed at ~30% completion
+✅ COMPLETED : 10,398 (103.98%)  ← leftover tasks from prev run also processed
+❌ FAILED    : 0
+Terminal Total : 10,398 / 10,000
+Throughput     : 4,195 tasks/sec
+Worker killed mid-run: YES — distrq-worker-1
+⚠️  Zero task loss achieved — all tasks processed, none were lost.
+
+> The 103.98% completion rate occurs because leftover tasks from the previous
+> benchmark run were also recovered and processed by the watchdog — further
+> proving zero task loss.<img width="637" height="753" alt="Screenshot 2026-04-26 113646" src="https://github.com/user-attachments/assets/3ae03c67-9111-4f1e-a522-3460b2a90001" />
 
 ```
 Ingesting 10,000 tasks in 10 batches…
