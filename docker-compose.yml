@@ -1,0 +1,126 @@
+networks:
+  distrq_net:
+    driver: bridge
+
+volumes:
+  postgres_data:
+  redis_data:
+
+x-common-env: &common-env
+  DATABASE_URL:       postgresql://distrq:distrq@postgres:5432/distrq
+  ASYNC_DATABASE_URL: postgresql+asyncpg://distrq:distrq@postgres:5432/distrq
+  REDIS_URL:          redis://redis:6379/0
+  VISIBILITY_TIMEOUT: "30"
+  HEARTBEAT_INTERVAL: "5"
+  STALE_THRESHOLD:    "20"
+  WATCHDOG_INTERVAL:  "10"
+  DEFAULT_MAX_RETRIES: "3"
+
+services:
+
+  postgres:
+    image: postgres:16-alpine
+    container_name: distrq_postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER:     distrq
+      POSTGRES_PASSWORD: distrq
+      POSTGRES_DB:       distrq
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./scripts/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    ports:
+      - "5432:5432"
+    networks:
+      - distrq_net
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U distrq -d distrq"]
+      interval: 5s
+      timeout:  3s
+      retries:  10
+
+  redis:
+    image: redis:7-alpine
+    container_name: distrq_redis
+    restart: unless-stopped
+    command: >
+      redis-server
+      --maxmemory       512mb
+      --maxmemory-policy noeviction
+      --appendonly      yes
+      --appendfsync     everysec
+    volumes:
+      - redis_data:/data
+    ports:
+      - "6379:6379"
+    networks:
+      - distrq_net
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout:  3s
+      retries:  10
+
+  api:
+    build:
+      context: .
+      dockerfile: api/Dockerfile
+    container_name: distrq_api
+    restart: unless-stopped
+    environment:
+      <<: *common-env
+      API_HOST: "0.0.0.0"
+      API_PORT: "8000"
+    ports:
+      - "8000:8000"
+    networks:
+      - distrq_net
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://localhost:8000/health || exit 1"]
+      interval: 10s
+      timeout:  5s
+      retries:  5
+
+  worker:
+    build:
+      context: .
+      dockerfile: worker/Dockerfile
+    restart: unless-stopped
+    environment:
+      <<: *common-env
+      WORKER_CONCURRENCY: "50"
+      POLL_INTERVAL:      "0.1"
+    networks:
+      - distrq_net
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    deploy:
+      replicas: 3
+      resources:
+        limits:
+          cpus:   "1.0"
+          memory: "256m"
+
+  watchdog:
+    build:
+      context: .
+      dockerfile: watchdog/Dockerfile
+    container_name: distrq_watchdog
+    restart: unless-stopped
+    environment:
+      <<: *common-env
+    networks:
+      - distrq_net
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
